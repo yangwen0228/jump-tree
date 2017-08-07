@@ -2,7 +2,7 @@
 
 jump-tree is an undo-tree like jumping implementation, so that we can jump back and forth in a tree way like undo-tree. It's inspired by and a combination of undo-tree and jumplist.
 
-![Imgur](http://imgur.com/a/aNkbP)
+![demo](https://github.com/yangwen0228/jump-tree/blob/master/jump-tree.gif)
 
 ## Installation
 You can install  manually from github;
