@@ -1,30 +1,27 @@
 ;;; jump-tree-pos.el --- Treat position history as a tree  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2009-2017  Free Software Foundation, Inc
+;; Copyright (C) 2017  Free Software Foundation, Inc
 
 ;; Author: Wen Yang <yangwen0228@foxmail.com>
 ;; Maintainer: Wen Yang <yangwen0228@foxmail.com>
-;; Version: 0.1.0
 ;; Package-Version: 20170803.1
-;; Keywords: convenience, files, jump, tree
-;; URL:
-;; Repository:
+;; URL: https://github.com/yangwen0228/jump-tree
+;; Keywords: convenience, position, jump, tree
 
-;; This file is part of Emacs.
-;;
-;; This file is free software: you can redistribute it and/or modify it under
-;; the terms of the GNU General Public License as published by the Free
-;; Software Foundation, either version 3 of the License, or (at your option)
-;; any later version.
-;;
-;; This program is distributed in the hope that it will be useful, but WITHOUT
-;; ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-;; FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-;; more details.
-;;
-;; You should have received a copy of the GNU General Public License along
-;; with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; This file is NOT part of GNU Emacs.
 
+;; This program is free software; you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 ;; This file serves as the core functionality of this package.  We use a list
