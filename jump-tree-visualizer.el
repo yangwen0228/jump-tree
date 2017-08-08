@@ -26,6 +26,10 @@
 ;; with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
 
 
+
+;;; Commentary:
+;; This file serves as the visualizer of the jump-tree.
+
 ;;; Code:
 
 (eval-when-compile (require 'cl))
@@ -46,16 +50,14 @@
 ;;; =====================================================================
 ;;;              Global variables and customization options
 (defcustom jump-tree-visualizer-relative-timestamps t
-  "When non-nil, display times relative to current time
-when displaying time stamps in visualizer.
+  "When non-nil, display times relative to current time.
 
-Otherwise, display absolute times."
+When displaying time stamps in visualizer.  Otherwise, display absolute times."
   :group 'jump-tree
   :type 'boolean)
 
 (defcustom jump-tree-visualizer-timestamps nil
-  "When non-nil, display time-stamps by default
-in jump-tree visualizer.
+  "When non-nil, display time-stamps by default in jump-tree visualizer.
 
 \\<jump-tree-visualizer-mode-map>You can always toggle time-stamps on and off \
 using \\[jump-tree-visualizer-toggle-timestamps], regardless of the
@@ -72,16 +74,16 @@ value.
 
 Lazy drawing means that only the visible portion of the tree will
 be drawn initially, and the tree will be extended later as
-needed. For the most part, the only visible effect of this is to
+needed.  For the most part, the only visible effect of this is to
 significantly speed up displaying the visualizer for very large
 trees.
 
-There is one potential negative effect of lazy drawing. Other
+There is one potential negative effect of lazy drawing.  Other
 branches of the tree will only be drawn once the node from which
-they branch off becomes visible. So it can happen that certain
+they branch off becomes visible.  So it can happen that certain
 portions of the tree that would be shown with lazy drawing
 disabled, will not be drawn immediately when it is
-enabled. However, this effect is quite rare in practice."
+enabled.  However, this effect is quite rare in practice."
   :group 'jump-tree
   :type '(choice (const :tag "never" nil)
                  (const :tag "always" t)
@@ -116,19 +118,18 @@ in visualizer."
 (put 'jump-tree-visualizer-parent-buffer 'permanent-local t)
 (make-variable-buffer-local 'jump-tree-visualizer-parent-buffer)
 
-;; stores modification time of parent buffer's file, if any
-(defvar jump-tree-visualizer-parent-mtime nil)
+(defvar jump-tree-visualizer-parent-mtime nil
+  "Store modification time of parent buffer's file, if any.")
 (put 'jump-tree-visualizer-parent-mtime 'permanent-local t)
 (make-variable-buffer-local 'jump-tree-visualizer-parent-mtime)
 
-;; stores current horizontal spacing needed for drawing jump-tree
-(defvar jump-tree-visualizer-spacing nil)
+(defvar jump-tree-visualizer-spacing nil
+  "Store current horizontal spacing needed for drawing jump-tree.")
 (put 'jump-tree-visualizer-spacing 'permanent-local t)
 (make-variable-buffer-local 'jump-tree-visualizer-spacing)
 
-;; calculate horizontal spacing required for drawing tree with current
-;; settings
 (defsubst jump-tree-visualizer-calculate-spacing ()
+  "Calculate horizontal spacing required for drawing tree with current settings."
   (if jump-tree-visualizer-timestamps
       (if jump-tree-visualizer-relative-timestamps 9 13)
     3))
@@ -275,10 +276,12 @@ in visualizer."
   lwidth cwidth rwidth marker)
 
 (defmacro jump-tree-visualizer-data-p (v)
+  "Check V is whether a `jump-tree-make-visualizer-data'."
   (let ((len (length (jump-tree-make-visualizer-data))))
     `(and (vectorp ,v) (= (length ,v) ,len))))
 
 (defun jump-tree-node-clear-visualizer-data (node)
+  "Clear the data in NODE's :visualizer field."
   (let ((plist (jump-tree-node-meta-data node)))
     (if (eq (car plist) :visualizer)
         (setf (jump-tree-node-meta-data node) (nthcdr 2 plist))
@@ -287,21 +290,25 @@ in visualizer."
       (if plist (setcdr plist (nthcdr 3 plist))))))
 
 (defmacro jump-tree-node-lwidth (node)
+  "Fetch LWIDTH data from NODE's meta-data field :visualizer."
   `(let ((v (plist-get (jump-tree-node-meta-data ,node) :visualizer)))
      (when (jump-tree-visualizer-data-p v)
        (jump-tree-visualizer-data-lwidth v))))
 
 (defmacro jump-tree-node-cwidth (node)
+  "Fetch CWIDTH data from NODE's meta-data field :visualizer."
   `(let ((v (plist-get (jump-tree-node-meta-data ,node) :visualizer)))
      (when (jump-tree-visualizer-data-p v)
        (jump-tree-visualizer-data-cwidth v))))
 
 (defmacro jump-tree-node-rwidth (node)
+  "Fetch RWIDTH data from NODE's meta-data field :visualizer."
   `(let ((v (plist-get (jump-tree-node-meta-data ,node) :visualizer)))
      (when (jump-tree-visualizer-data-p v)
        (jump-tree-visualizer-data-rwidth v))))
 
 (defmacro jump-tree-node-marker (node)
+  "Fetch MARKER data from NODE's meta-data field :visualizer."
   `(let ((v (plist-get (jump-tree-node-meta-data ,node) :visualizer)))
      (when (jump-tree-visualizer-data-p v)
        (jump-tree-visualizer-data-marker v))))
@@ -360,9 +367,9 @@ in visualizer."
         (pop stack)))))
 
 (defun jump-tree-node-compute-widths (node)
-  ;; Compute NODE's left-, centre-, and right-subtree widths. Returns widths
-  ;; (in a vector) if successful. Otherwise, returns a node whose widths need
-  ;; calculating before NODE's can be calculated.
+  "Compute NODE's left-, centre-, and right-subtree widths.
+Returns widths (in a vector) if successful.  Otherwise, returns a node whose
+widths need calculating before NODE's can be calculated."
   (let ((num-children (length (jump-tree-node-next node)))
         (lwidth 0) (cwidth 0) (rwidth 0) p)
     (catch 'need-widths
@@ -428,7 +435,7 @@ in visualizer."
       (vector lwidth cwidth rwidth))))
 
 (defun jump-tree-clear-visualizer-data (tree)
-  ;; Clear visualizer data below NODE.
+  "Clear visualizer data of TREE."
   (jump-tree-mapc
    (lambda (n) (jump-tree-node-clear-visualizer-data n))
    (jump-tree-root tree)))
@@ -440,7 +447,7 @@ in visualizer."
   "Visualize the current buffer's position tree."
   (interactive "*")
   (unless jump-tree-mode
-    (user-error "jump-tree mode not enabled in buffer"))
+    (user-error "`jump-tree-mode' not enabled in buffer"))
   (deactivate-mark)
   ;; throw error if position is disabled in buffer
   (when (eq jump-tree-pos-list t)
@@ -474,16 +481,17 @@ in visualizer."
                       jump-tree-visualizer-lazy-drawing))))
     (let ((inhibit-read-only t)) (jump-tree-draw-tree jump-tree))))
 
-(defun jump-tree-kill-visualizer (&rest _dummy)
-  ;; Kill visualizer. Added to `before-change-functions' hook of original
-  ;; buffer when visualizer is invoked.
+(defun jump-tree-kill-visualizer ()
+  "Kill visualizer.
+Added to `before-change-functions' hook of original buffer when
+visualizer is invoked."
   (unless (or jump-tree-inhibit-kill-visualizer
               (null (get-buffer jump-tree-visualizer-buffer-name)))
     (with-current-buffer jump-tree-visualizer-buffer-name
       (jump-tree-visualizer-quit))))
 
 (defun jump-tree-draw-tree (jump-tree)
-  ;; Draw jump-tree in current buffer starting from NODE (or root if nil).
+  "Draw JUMP-TREE in current buffer starting from root."
   (let ((node (if jump-tree-visualizer-lazy-drawing
                   (jump-tree-current jump-tree)
                 (jump-tree-root jump-tree))))
@@ -531,12 +539,13 @@ in visualizer."
     (jump-tree-draw-node (jump-tree-current jump-tree) 'current)))
 
 (defun jump-tree-extend-down (node &optional bottom)
-  ;; Extend tree downwards starting from NODE and point. If BOTTOM is t,
-  ;; extend all the way down to the leaves. If BOTTOM is a node, extend down
-  ;; as far as that node. If BOTTOM is an integer, extend down as far as that
-  ;; line. Otherwise, only extend visible portion of tree. NODE is assumed to
-  ;; already have a node marker. Returns non-nil if anything was actually
-  ;; extended.
+  "Extend tree downwards starting from NODE and point.
+If BOTTOM is t,extend all the way down to the leaves.
+If BOTTOM is a node, extend down as far as that node.
+If BOTTOM is an integer, extend down as far as that line.
+Otherwise, only extend visible portion of tree.  NODE is assumed to
+already have a node marker.  Returns non-nil if anything was actually
+extended."
   (let ((extended nil)
         (cur-stack (list node))
         next-stack)
@@ -573,11 +582,11 @@ in visualizer."
     extended))
 
 (defun jump-tree-extend-up (node &optional top)
-  ;; Extend tree upwards starting from NODE. If TOP is t, extend all the way
-  ;; to root. If TOP is a node, extend up as far as that node. If TOP is an
-  ;; integer, extend up as far as that line. Otherwise, only extend visible
-  ;; portion of tree. NODE is assumed to already have a node marker. Returns
-  ;; non-nil if anything was actually extended.
+  "Extend tree upwards starting from NODE.
+If TOP is t, extend all the way to root.  If TOP is a node, extend up
+as far as that node.  If TOP is an integer, extend up as far as that line.
+Otherwise, only extend visible portion of tree.  NODE is assumed to already
+have a node marker.  Returns non-nil if anything was actually extended."
   (let ((extended nil) parent)
     ;; don't bother extending if TOP specifies an already-drawn node
     (unless (and (jump-tree-node-p top) (jump-tree-node-marker top))
@@ -624,9 +633,10 @@ in visualizer."
     extended))
 
 (defun jump-tree-expand-down (from &optional to)
-  ;; Expand tree downwards. FROM is the node to start expanding from. Stop
-  ;; expanding at TO if specified. Otherwise, just expand visible portion of
-  ;; tree and highlight active branch from FROM.
+  "Expand tree downwards.
+FROM is the node to start expanding from.  Stop expanding at TO if specified.
+Otherwise, just expand visible portion of tree and highlight active branch
+from FROM."
   (when jump-tree-visualizer-needs-extending-down
     (let ((inhibit-read-only t)
           node-list extended)
@@ -648,9 +658,10 @@ in visualizer."
             (jump-tree-highlight-active-branch from)))))))
 
 (defun jump-tree-expand-up (from &optional to)
-  ;; Expand tree upwards. FROM is the node to start expanding from, TO is the
-  ;; node to stop expanding at. If TO node isn't specified, just expand visible
-  ;; portion of tree and highlight active branch down to FROM.
+  "Expand tree upwards.
+FROM is the node to start expanding from, TO is the node to stop expanding at.
+If TO node isn't specified, just expand visible portion of tree and highlight
+active branch down to FROM."
   (when jump-tree-visualizer-needs-extending-up
     (let ((inhibit-read-only t)
           extended node-list)
@@ -683,8 +694,8 @@ in visualizer."
            from))))))
 
 (defun jump-tree-highlight-active-branch (node &optional end)
-  ;; Draw highlighted active branch below NODE in current buffer. Stop
-  ;; highlighting at END node if specified.
+  "Draw highlighted active branch below NODE in current buffer.
+Stop highlighting at END node if specified."
   (let ((stack (list node)))
     ;; draw active branch
     (while stack
@@ -696,8 +707,8 @@ in visualizer."
               stack (nconc stack node))))))
 
 (defun jump-tree-draw-node (node &optional current)
-  ;; Draw symbol representing NODE in visualizer. If CURRENT is non-nil, node
-  ;; is current node.
+  "Draw symbol representing NODE in visualizer.
+If CURRENT is non-nil, node is current node."
   (goto-char (jump-tree-node-marker node))
   (when jump-tree-visualizer-timestamps
     (jump-tree-move-backward (/ jump-tree-visualizer-spacing 2)))
@@ -742,9 +753,9 @@ in visualizer."
     (put-text-property (point) (1+ (point)) 'jump-tree-node node)))
 
 (defun jump-tree-draw-subtree (node &optional active-branch)
-  ;; Draw subtree rooted at NODE. The subtree will start from point.
-  ;; If ACTIVE-BRANCH is non-nil, just draw active branch below NODE. Returns
-  ;; list of nodes below NODE.
+  "Draw subtree rooted at NODE.  The subtree will start from point.
+If ACTIVE-BRANCH is non-nil, just draw active branch below NODE.  Returns
+list of nodes below NODE."
   (let ((num-children (length (jump-tree-node-next node)))
         node-list pos trunk-pos n)
     ;; draw node itself
@@ -869,22 +880,22 @@ in visualizer."
     (nreverse node-list)))
 
 (defun jump-tree-node-char-lwidth (node)
-  ;; Return left-width of NODE measured in characters.
+  "Return left-width of NODE measured in characters."
   (if (= (length (jump-tree-node-next node)) 0) 0
     (- (* (+ jump-tree-visualizer-spacing 1) (jump-tree-node-lwidth node))
        (if (= (jump-tree-node-cwidth node) 0)
            (1+ (/ jump-tree-visualizer-spacing 2)) 0))))
 
 (defun jump-tree-node-char-rwidth (node)
-  ;; Return right-width of NODE measured in characters.
+  "Return right-width of NODE measured in characters."
   (if (= (length (jump-tree-node-next node)) 0) 0
     (- (* (+ jump-tree-visualizer-spacing 1) (jump-tree-node-rwidth node))
        (if (= (jump-tree-node-cwidth node) 0)
            (1+ (/ jump-tree-visualizer-spacing 2)) 0))))
 
 (defun jump-tree-insert (str &optional arg)
-  ;; Insert character or string STR ARG times, overwriting, and using
-  ;; `jump-tree-insert-face'.
+  "Insert character or string STR ARG times.
+Overwriting and using `jump-tree-insert-face'."
   (unless arg (setq arg 1))
   (when (characterp str)
     (setq str (make-string arg str))
@@ -900,7 +911,8 @@ in visualizer."
     (put-text-property (- (point) arg) (point) 'face jump-tree-insert-face)))
 
 (defun jump-tree-move-down (&optional arg)
-  ;; Move down, extending buffer if necessary.
+  "Move down, extending buffer if necessary.
+A numeric ARG serves as a repeat count."
   (let ((row (line-number-at-pos))
         (col (current-column))
         line)
@@ -917,12 +929,14 @@ in visualizer."
     (jump-tree-move-forward col)))
 
 (defun jump-tree-move-up (&optional arg)
-  ;; Move up, extending buffer if necessary.
+  "Move up, extending buffer if necessary.
+A numeric ARG serves as a repeat count."
   (unless arg (setq arg 1))
   (jump-tree-move-down (- arg)))
 
 (defun jump-tree-move-forward (&optional arg)
-  ;; Move forward, extending buffer if necessary.
+  "Move forward, extending buffer if necessary.
+A numeric ARG serves as a repeat count."
   (unless arg (setq arg 1))
   (let (n)
     (cond
@@ -947,12 +961,13 @@ in visualizer."
       (backward-char arg)))))
 
 (defun jump-tree-move-backward (&optional arg)
-  ;; Move backward, extending buffer if necessary.
+  "Move backward, extending buffer if necessary.
+A numeric ARG serves as a repeat count."
   (unless arg (setq arg 1))
   (jump-tree-move-forward (- arg)))
 
 (defun jump-tree-move-to-parent (node)
-  ;; Move to position of parent of NODE, extending buffer if necessary.
+  "Move to position of parent of NODE, extending buffer if necessary."
   (let* ((parent (jump-tree-node-previous node))
          (n (jump-tree-node-next parent))
          (l (length n)) p)
@@ -1001,8 +1016,8 @@ in visualizer."
 
 (defun jump-tree-timestamp-to-string
     (timestamp &optional relative current register)
-  ;; Convert TIMESTAMP to string (either absolute or RELATVE time), indicating
-  ;; if it's the CURRENT node and/or has an associated REGISTER.
+  "Convert TIMESTAMP to string (either absolute or RELATIVE time).
+Indicating if it's the CURRENT node and/or has an associated REGISTER."
   (if relative
       ;; relative time
       (let ((time (floor (float-time
@@ -1062,10 +1077,11 @@ Within the jump-tree visualizer, the following keys are available:
   (setq jump-tree-visualizer-selected-node nil))
 
 (defun jump-tree-visualize-jump-prev (&optional arg)
-  "Jump-Prev changes. A numeric ARG serves as a repeat count."
+  "Jump to the previous position.
+A numeric ARG serves as a repeat count."
   (interactive "p")
   (unless (eq major-mode 'jump-tree-visualizer-mode)
-    (user-error "jump-tree mode not enabled in buffer"))
+    (user-error "`jump-tree-mode' not enabled in buffer"))
   (let ((old (jump-tree-current jump-tree-pos-tree))
         current)
     ;; unhighlight old current node
@@ -1086,10 +1102,11 @@ Within the jump-tree visualizer, the following keys are available:
       (let ((inhibit-read-only t)) (jump-tree-draw-node current 'current)))))
 
 (defun jump-tree-visualize-jump-next (&optional arg)
-  "Jump-Next changes. A numeric ARG serves as a repeat count."
+  "Jump to the next position.
+A numeric ARG serves as a repeat count."
   (interactive "p")
   (unless (eq major-mode 'jump-tree-visualizer-mode)
-    (user-error "jump-tree mode not enabled in buffer"))
+    (user-error "`jump-tree-mode' not enabled in buffer"))
   (let ((old (jump-tree-current jump-tree-pos-tree))
         current)
     ;; unhighlight old current node
@@ -1112,10 +1129,11 @@ Within the jump-tree visualizer, the following keys are available:
 (defun jump-tree-visualize-switch-branch-right (arg)
   "Switch to next branch of the position tree.
 This will affect which branch to descend when *jump-nexting* changes
-using `jump-tree-jump-next' or `jump-tree-visualizer-jump-next'."
+using `jump-tree-jump-next' or `jump-tree-visualizer-jump-next'.
+A numeric ARG serves as a repeat count."
   (interactive "p")
   (unless (eq major-mode 'jump-tree-visualizer-mode)
-    (user-error "jump-tree mode not enabled in buffer"))
+    (user-error "`jump-tree-mode' not enabled in buffer"))
   ;; un-highlight old active branch below current node
   (goto-char (jump-tree-node-marker (jump-tree-current jump-tree-pos-tree)))
   (let ((jump-tree-insert-face 'jump-tree-visualizer-default-face)
@@ -1140,7 +1158,8 @@ using `jump-tree-jump-next' or `jump-tree-visualizer-jump-next'."
 (defun jump-tree-visualize-switch-branch-left (arg)
   "Switch to previous branch of the position tree.
 This will affect which branch to descend when *jump-nexting* changes
-using `jump-tree-jump-next' or `jump-tree-visualizer-jump-next'."
+using `jump-tree-jump-next' or `jump-tree-visualizer-jump-next'.
+A numeric ARG serves as a repeat count."
   (interactive "p")
   (jump-tree-visualize-switch-branch-right (- arg)))
 
@@ -1148,7 +1167,7 @@ using `jump-tree-jump-next' or `jump-tree-visualizer-jump-next'."
   "Quit the jump-tree visualizer."
   (interactive)
   (unless (eq major-mode 'jump-tree-visualizer-mode)
-    (user-error "jump-tree mode not enabled in buffer"))
+    (user-error "`jump-tree-mode' not enabled in buffer"))
   (jump-tree-clear-visualizer-data jump-tree-pos-tree)
   ;; remove kill visualizer hook from parent buffer
   (unwind-protect
@@ -1168,17 +1187,17 @@ using `jump-tree-jump-next' or `jump-tree-visualizer-jump-next'."
   "Quit the jump-tree visualizer and return buffer to original state."
   (interactive)
   (unless (eq major-mode 'jump-tree-visualizer-mode)
-    (user-error "jump-tree mode not enabled in buffer"))
+    (user-error "`jump-tree-mode' not enabled in buffer"))
   (let ((node jump-tree-visualizer-initial-node))
     (jump-tree-visualizer-quit)
     (jump-tree-set node)))
 
 (defun jump-tree-visualizer-set (&optional pos)
-  "Set buffer to state corresponding to position tree node
-at POS, or point if POS is nil."
+  "Set buffer to state corresponding to position tree node at POS.
+Or point if POS is nil."
   (interactive)
   (unless (eq major-mode 'jump-tree-visualizer-mode)
-    (user-error "jump-tree mode not enabled in buffer"))
+    (user-error "`jump-tree-mode' not enabled in buffer"))
   (unless pos (setq pos (point)))
   (let ((node (get-text-property pos 'jump-tree-node)))
     (when node
@@ -1190,18 +1209,18 @@ at POS, or point if POS is nil."
       (let ((inhibit-read-only t)) (jump-tree-draw-tree jump-tree-pos-tree)))))
 
 (defun jump-tree-visualizer-mouse-set (pos)
-  "Set buffer to state corresponding to position tree node
-at mouse event POS."
+  "Set buffer to state corresponding to position tree node at mouse event POS."
+
   (interactive "@e")
   (unless (eq major-mode 'jump-tree-visualizer-mode)
-    (user-error "jump-tree mode not enabled in buffer"))
+    (user-error "`jump-tree-mode' not enabled in buffer"))
   (jump-tree-visualizer-set (event-start (nth 1 pos))))
 
 (defun jump-tree-visualize-jump-prev-to-x (&optional x)
   "Jump-Prev to last branch point, register, or saved state.
-If X is the symbol `branch', position to last branch point. If X is
-the symbol `register', position to last register. If X is the sumbol
-`saved', position to last saved state. If X is null, position to first of
+If X is the symbol `branch', position to last branch point.  If X is
+the symbol `register', position to last register.  If X is the sumbol
+`saved', position to last saved state.  If X is null, position to first of
 these that's encountered.
 Interactively, a single \\[universal-argument] specifies
 `branch', a double \\[universal-argument] \\[universal-argument]
@@ -1209,7 +1228,7 @@ specifies `saved', and a negative prefix argument specifies
 `register'."
   (interactive "P")
   (unless (eq major-mode 'jump-tree-visualizer-mode)
-    (user-error "jump-tree mode not enabled in buffer"))
+    (user-error "`jump-tree-mode' not enabled in buffer"))
   (when (and (called-interactively-p 'any) x)
     (setq x (prefix-numeric-value x)
           x (cond
@@ -1228,28 +1247,34 @@ specifies `saved', and a negative prefix argument specifies
   "Toggle display of time-stamps."
   (interactive)
   (unless (eq major-mode 'jump-tree-visualizer-mode)
-    (user-error "jump-tree mode not enabled in buffer"))
+    (user-error "`jump-tree-mode' not enabled in buffer"))
   (setq jump-tree-visualizer-timestamps (not jump-tree-visualizer-timestamps))
   (setq jump-tree-visualizer-spacing (jump-tree-visualizer-calculate-spacing))
   ;; redraw tree
   (let ((inhibit-read-only t)) (jump-tree-draw-tree jump-tree-pos-tree)))
 
 (defun jump-tree-visualizer-scroll-left (&optional arg)
+  "The scroll the window contents left.
+A numeric ARG serves as a repeat count."
   (interactive "p")
   (unless (eq major-mode 'jump-tree-visualizer-mode)
-    (user-error "jump-tree mode not enabled in buffer"))
+    (user-error "`jump-tree-mode' not enabled in buffer"))
   (scroll-left (or arg 1) t))
 
 (defun jump-tree-visualizer-scroll-right (&optional arg)
+  "The scroll the window contents right.
+A numeric ARG serves as a repeat count."
   (interactive "p")
   (unless (eq major-mode 'jump-tree-visualizer-mode)
-    (user-error "jump-tree mode not enabled in buffer"))
+    (user-error "`jump-tree-mode' not enabled in buffer"))
   (scroll-right (or arg 1) t))
 
 (defun jump-tree-visualizer-scroll-up (&optional arg)
+    "The scroll the window contents up.
+A numeric ARG serves as a repeat count."
   (interactive "P")
   (unless (eq major-mode 'jump-tree-visualizer-mode)
-    (user-error "jump-tree mode not enabled in buffer"))
+    (user-error "`jump-tree-mode' not enabled in buffer"))
   (if (or (and (numberp arg) (< arg 0)) (eq arg '-))
       (jump-tree-visualizer-scroll-down arg)
     ;; scroll up and expand newly-visible portion of tree
@@ -1263,9 +1288,11 @@ specifies `saved', and a negative prefix argument specifies
       (scroll-up))))
 
 (defun jump-tree-visualizer-scroll-down (&optional arg)
+  "The scroll the window contents down.
+A numeric ARG serves as a repeat count."
   (interactive "P")
   (unless (eq major-mode 'jump-tree-visualizer-mode)
-    (user-error "jump-tree mode not enabled in buffer"))
+    (user-error "`jump-tree-mode' not enabled in buffer"))
   (if (or (and (numberp arg) (< arg 0)) (eq arg '-))
       (jump-tree-visualizer-scroll-up arg)
     ;; ensure there's enough room at top of buffer to scroll
@@ -1306,10 +1333,11 @@ specifies `saved', and a negative prefix argument specifies
     (goto-char (jump-tree-node-marker (jump-tree-current jump-tree-pos-tree))))))
 
 (defun jump-tree-visualizer-select-previous (&optional arg)
-  "Move to previous node."
+  "Move to previous node.
+A numeric ARG serves as a repeat count."
   (interactive "p")
   (unless (eq major-mode 'jump-tree-visualizer-mode)
-    (user-error "jump-tree mode not enabled in buffer"))
+    (user-error "`jump-tree-mode' not enabled in buffer"))
   (let ((node jump-tree-visualizer-selected-node))
     (catch 'top
       (dotimes (i (or arg 1))
@@ -1323,10 +1351,11 @@ specifies `saved', and a negative prefix argument specifies
     (setq jump-tree-visualizer-selected-node node)))
 
 (defun jump-tree-visualizer-select-next (&optional arg)
-  "Move to next node."
+  "Move to next node.
+A numeric ARG serves as a repeat count."
   (interactive "p")
   (unless (eq major-mode 'jump-tree-visualizer-mode)
-    (user-error "jump-tree mode not enabled in buffer"))
+    (user-error "`jump-tree-mode' not enabled in buffer"))
   (let ((node jump-tree-visualizer-selected-node))
     (catch 'bottom
       (dotimes (i (or arg 1))
@@ -1342,10 +1371,11 @@ specifies `saved', and a negative prefix argument specifies
     (setq jump-tree-visualizer-selected-node node)))
 
 (defun jump-tree-visualizer-select-right (&optional arg)
-  "Move right to a sibling node."
+  "Move right to a sibling node.
+A numeric ARG serves as a repeat count."
   (interactive "p")
   (unless (eq major-mode 'jump-tree-visualizer-mode)
-    (user-error "jump-tree mode not enabled in buffer"))
+    (user-error "`jump-tree-mode' not enabled in buffer"))
   (let ((node jump-tree-visualizer-selected-node)
         end)
     (goto-char (jump-tree-node-marker jump-tree-visualizer-selected-node))
@@ -1361,10 +1391,11 @@ specifies `saved', and a negative prefix argument specifies
     (when node (setq jump-tree-visualizer-selected-node node))))
 
 (defun jump-tree-visualizer-select-left (&optional arg)
-  "Move left to a sibling node."
+  "Move left to a sibling node.
+A numeric ARG serves as a repeat count."
   (interactive "p")
   (unless (eq major-mode 'jump-tree-visualizer-mode)
-    (user-error "jump-tree mode not enabled in buffer"))
+    (user-error "`jump-tree-mode' not enabled in buffer"))
   (let ((node (get-text-property (point) 'jump-tree-node))
         beg)
     (goto-char (jump-tree-node-marker jump-tree-visualizer-selected-node))
@@ -1380,6 +1411,7 @@ specifies `saved', and a negative prefix argument specifies
     (when node (setq jump-tree-visualizer-selected-node node))))
 
 (defun jump-tree-visualizer-select (pos)
+  "Select position tree node at enter event POS."
   (let ((node (get-text-property pos 'jump-tree-node)))
     (when node
       ;; select node at POS
@@ -1396,7 +1428,7 @@ specifies `saved', and a negative prefix argument specifies
   "Select position tree node at mouse event POS."
   (interactive "@e")
   (unless (eq major-mode 'jump-tree-visualizer-mode)
-    (user-error "jump-tree mode not enabled in buffer"))
+    (user-error "`jump-tree-mode' not enabled in buffer"))
   (jump-tree-visualizer-select (event-start (nth 1 pos))))
 
 (provide 'jump-tree-visualizer)

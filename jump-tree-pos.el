@@ -25,6 +25,16 @@
 ;; You should have received a copy of the GNU General Public License along
 ;; with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
 
+
+;;; Commentary:
+;; This file serves as the core functionality of this package.  We use a list
+;; to record the positions `(file-path . point-marker)'.  And when we
+;; run command `jump-tree-jump-prev', `jump-tree-jump-next'
+;; or `jump-tree-visualize', we transfer the list into the `jump-tree-pos-tree'.
+;; This tree has a root and a current node.  Every tree node has a previous
+;; node or parent node, and a next node represents a list of child nodes.
+;; And we use a banch number to represents the index of the child nodes.
+
 ;;; Code:
 
 (eval-when-compile (require 'cl))
@@ -65,7 +75,7 @@
   "Jump-Tree-Pos-List state.")
 
 (defcustom jump-tree-pos-list-limit 40
-  "Max length of jump-tree-pos-list."
+  "Max length of ‘jump-tree-pos-list’."
   :type 'integer
   :group 'jump-tree)
 
@@ -95,8 +105,7 @@
   :group 'jump-tree)
 
 (defcustom jump-tree-mode-lighter " Jump-Tree"
-  "Lighter displayed in mode line
-when `jump-tree-mode' is enabled."
+  "Lighter displayed in mode line when command `jump-tree-mode' is enabled."
   :group 'jump-tree
   :type 'string)
 
@@ -105,7 +114,7 @@ when `jump-tree-mode' is enabled."
 ;;;              jump-tree record position list
 
 (defun jump-tree-pos-list-jump (position)
-  "Do jump to target file and point from BUFF."
+  "Do jump to target file and point from POSITION."
   (let ((file-path (car position))
         (marker (cdr position)))
     (when (and (markerp marker) (marker-buffer marker))
@@ -119,6 +128,7 @@ when `jump-tree-mode' is enabled."
   (push position jump-tree-pos-list))
 
 (defun jump-tree-pos-list-same-position? (position)
+  "Check whether current POSITION is equal with the last POSITION in list."
   (let ((new-point (cdr position))
         (top-point (cdar jump-tree-pos-list)))
     (cond ((not new-point) nil)
@@ -171,6 +181,7 @@ when `jump-tree-mode' is enabled."
   previous next position timestamp branch meta-data)
 
 (defmacro jump-tree-node-p (n)
+  "Check node N is whether a `jump-tree-node'."
   (let ((len (length (jump-tree-make-node nil nil))))
     `(and (vectorp ,n) (= (length ,n) ,len))))
 
@@ -184,15 +195,18 @@ when `jump-tree-mode' is enabled."
   file-path marker)
 
 (defmacro jump-tree-position-data-p (pos)
+  "Check POS is whether a `jump-tree-position-data'."
   (let ((len (length (jump-tree-make-position-data))))
     `(and (vectorp ,pos) (= (length ,pos) ,len))))
 
 (defmacro jump-tree-node-file-path (node)
+  "Fetch FILE-PATH data from NODE's meta-data field :position."
   `(let ((pos (plist-get (jump-tree-node-meta-data ,node) :position)))
      (when (jump-tree-position-data-p pos)
        (jump-tree-position-data-file-path pos))))
 
 (defmacro jump-tree-node-marker (node)
+  "Fetch MARKER data from NODE's meta-data field :position."
   `(let ((pos (plist-get (jump-tree-node-meta-data ,node) :position)))
      (when (jump-tree-position-data-p pos)
        (jump-tree-position-data-marker pos))))
@@ -221,15 +235,18 @@ when `jump-tree-mode' is enabled."
   buffer node)
 
 (defun jump-tree-register-data-p (data)
+  "Check DATA is whether a `jump-tree-register-data'."
   (and (vectorp data)
        (= (length data) 2)
        (jump-tree-node-p (jump-tree-register-data-node data))))
 
 (defun jump-tree-register-data-print-func (data)
+  "Print DATA's register data."
   (princ (format "an jump-tree state for buffer %s"
                  (jump-tree-register-data-buffer data))))
 
 (defmacro jump-tree-node-register (node)
+  "Fetch REGISTER data from NODE's meta-data field :register."
   `(plist-get (jump-tree-node-meta-data ,node) :register))
 
 (defsetf jump-tree-node-register (node) (val)
@@ -244,7 +261,7 @@ when `jump-tree-mode' is enabled."
   '(length (jump-tree-node-next (jump-tree-current jump-tree-pos-tree))))
 
 (defun jump-tree-grow-backwards (node position)
-  "Add new node *above* jump-tree NODE, and return new node.
+  "Add new NODE with POSITION *above* jump-tree node, and return new node.
 Note that this will overwrite NODE's \"previous\" link, so should
 only be used on a detached NODE, never on nodes that are already
 part of `jump-tree-pos-tree'."
@@ -299,7 +316,7 @@ that are already part of `jump-tree-pos-tree'."
       (setf (jump-tree-node-previous n) parent))))
 
 (defun jump-tree-mapc (func node)
-  ;; Apply FUNC to NODE and to each node below it.
+  "Apply FUNC to NODE and to each node below it."
   (let ((stack (list node))
         n)
     (while stack
@@ -323,8 +340,8 @@ Comparison is done with `eq'."
 ;;; =====================================================================
 ;;;             position list utility functions
 (defun jump-tree-pos-list-discard-invalid ()
-  "If the file or buffer is closed, then the marker is invalid. This function will
-remove these invalid entries."
+  "If the file or buffer is closed, then the marker is invalid.
+This function will remove these invalid entries."
   (setq jump-tree-pos-list
         (remove-if (lambda (position)
                      (or (not (markerp (cdr position)))
@@ -332,7 +349,7 @@ remove these invalid entries."
                    jump-tree-pos-list)))
 
 (defun jump-tree-pos-list-transfer-to-tree ()
-  ;; Transfer entries accumulated in `jump-tree-pos-list' to `jump-tree-pos-tree'.
+  "Transfer entries accumulated in `jump-tree-pos-list' to `jump-tree-pos-tree'."
 
   ;; `jump-tree-pos-list-transfer-to-tree' should never be called when jump is disabled
   ;; (i.e. `jump-tree-pos-tree' is t)
@@ -364,8 +381,9 @@ remove these invalid entries."
     (jump-tree-discard-history)))
 
 (defun jump-tree-pos-list-rebuild-from-tree ()
-  "Rebuild `jump-tree-pos-list' from information in `jump-tree-pos-tree', when some
-buffers are closed, and the markers become invalid."
+  "Rebuild `jump-tree-pos-list' from information in `jump-tree-pos-tree'.
+When some buffers are closed, and the markers become invalid, we should clear
+these nodes."
   (unless (eq jump-tree-pos-list t)
     (jump-tree-pos-list-transfer-to-tree)
     (setq jump-tree-pos-list nil)
@@ -400,7 +418,7 @@ buffers are closed, and the markers become invalid."
 ;;;                History discarding utility functions
 
 (defun jump-tree-oldest-leaf (node)
-  ;; Return oldest leaf node below NODE.
+  "Return oldest leaf node below NODE."
   (while (jump-tree-node-next node)
     (setq node
           (car (sort (mapcar 'identity (jump-tree-node-next node))
@@ -410,8 +428,7 @@ buffers are closed, and the markers become invalid."
   node)
 
 (defun jump-tree-discard-node (node)
-  ;; Discard NODE from `jump-tree-pos-tree', and return next in line for
-  ;; discarding.
+  "Discard NODE from `jump-tree-pos-tree', and return next in line for discarding."
 
   ;; don't discard current node
   (unless (eq node (jump-tree-current jump-tree-pos-tree))
@@ -472,8 +489,8 @@ buffers are closed, and the markers become invalid."
           parent)))))
 
 (defun jump-tree-discard-history ()
-  "Discard position history until we're within memory usage limits
-set by `jump-tree-pos-tree-limit'."
+  "Discard position history until we're within memory usage limits.
+Set by `jump-tree-pos-tree-limit'."
 
   (when (> (jump-tree-count jump-tree-pos-tree) jump-tree-pos-tree-limit)
     ;; if there are no branches off root, first node to discard is root;
@@ -490,16 +507,16 @@ set by `jump-tree-pos-tree-limit'."
         (setq node (jump-tree-discard-node node))))))
 
 (defun jump-tree-jump-prev (&optional arg)
-  "Jump-Prev changes.
+  "Jump to the previous position.
 Repeat this command to position more changes.
 A numeric ARG serves as a repeat count.
 In Transient Mark mode when the mark is active, only position changes
-within the current region. Similarly, when not in Transient Mark
+within the current region.  Similarly, when not in Transient Mark
 mode, just \\[universal-argument] as an argument limits position to
 changes within the current region."
   (interactive "*P")
   (unless jump-tree-mode
-    (user-error "jump-tree mode not enabled in buffer"))
+    (user-error "`jump-tree-mode' not enabled in buffer"))
   ;; throw error if position is disabled in buffer
   (when (eq jump-tree-pos-list t)
     (user-error "No position information in this buffer"))
@@ -508,7 +525,8 @@ changes within the current region."
   (when (> (jump-tree-num-branches) 1) (message "Jump-Prev branch point!")))
 
 (defun jump-tree-jump-prev-1 (&optional arg)
-  ;; Internal position function.
+  "Internal position function.
+A numeric ARG serves as a repeat count."
   (setq deactivate-mark t)
   (let ((jump-tree-in-progress t)
         pos current)
@@ -529,14 +547,15 @@ changes within the current region."
       (jump-tree-pos-list-jump (jump-tree-node-position current)))))
 
 (defun jump-tree-jump-next (&optional arg)
-  "Jump-Next changes. A numeric ARG serves as a repeat count.
+  "Jump to the next position.
+A numeric ARG serves as a repeat count.
 In Transient Mark mode when the mark is active, only jump-next changes
-within the current region. Similarly, when not in Transient Mark
+within the current region.  Similarly, when not in Transient Mark
 mode, just \\[universal-argument] as an argument limits jump-next to
 changes within the current region."
   (interactive "*P")
   (unless jump-tree-mode
-    (user-error "jump-tree mode not enabled in buffer"))
+    (user-error "`jump-tree-mode' not enabled in buffer"))
   ;; throw error if position is disabled in buffer
   (when (eq jump-tree-pos-list t)
     (user-error "No position information in this buffer"))
@@ -545,7 +564,8 @@ changes within the current region."
   (when (> (jump-tree-num-branches) 1) (message "Jump-Prev branch point!")))
 
 (defun jump-tree-jump-next-1 (&optional arg)
-  ;; Internal jump-next function.
+  "Internal jump-next function.
+A numeric ARG serves as a repeat count."
   (setq deactivate-mark t)
   (let ((jump-tree-in-progress t)
         pos current)
@@ -583,7 +603,7 @@ using `jump-tree-jump-next'."
                                            (1- (jump-tree-num-branches)) b)))
                                  ))))))
   (unless jump-tree-mode
-    (user-error "jump-tree mode not enabled in buffer"))
+    (user-error "`jump-tree-mode' not enabled in buffer"))
   ;; throw error if position is disabled in buffer
   (when (eq jump-tree-pos-list t)
     (user-error "No position information in this buffer"))
@@ -600,8 +620,9 @@ using `jump-tree-jump-next'."
   (message "Switched to branch %d" branch))
 
 (defun jump-tree-set (node)
-  ;; Set buffer to state corresponding to NODE. Returns intersection point
-  ;; between path back from current node and path back from selected NODE.
+  "Set buffer to state corresponding to NODE.
+Returns intersection point between path back from current node and path
+back from selected NODE."
   (let ((path (make-hash-table :test 'eq))
         (n node))
     (puthash (jump-tree-root jump-tree-pos-tree) t path)
@@ -634,7 +655,7 @@ The saved state can be restored using
 Argument is a character, naming the register."
   (interactive "cjump-tree state to register: ")
   (unless jump-tree-mode
-    (user-error "jump-tree mode not enabled in buffer"))
+    (user-error "`jump-tree-mode' not enabled in buffer"))
   ;; throw error if position is disabled in buffer
   (when (eq jump-tree-pos-list t)
     (user-error "No position information in this buffer"))
@@ -656,7 +677,7 @@ The state must be saved using `jump-tree-save-state-to-register'.
 Argument is a character, naming the register."
   (interactive "*cRestore jump-tree state from register: ")
   (unless jump-tree-mode
-    (user-error "jump-tree mode not enabled in buffer"))
+    (user-error "`jump-tree-mode' not enabled in buffer"))
   ;; throw error if position is disabled in buffer, or if register doesn't contain
   ;; an jump-tree node
   (let ((data (registerv-data (get-register register))))
