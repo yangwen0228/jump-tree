@@ -1169,7 +1169,9 @@ A numeric ARG serves as a repeat count."
   (unwind-protect
       (with-current-buffer jump-tree-visualizer-parent-buffer
         (remove-hook 'before-change-functions 'jump-tree-kill-visualizer t))
-    (let ((parent jump-tree-visualizer-parent-buffer)
+    (let ((parent (marker-buffer
+                   (cdr (jump-tree-node-position
+                         (jump-tree-current jump-tree-pos-tree)))))
           window)
       ;; kill visualizer buffer
       (kill-buffer nil)
