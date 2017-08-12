@@ -75,9 +75,6 @@
 (defvar jump-tree-pos-tree nil
   "Tree of position entries globally.")
 
-(defvar jump-tree-in-progress nil
-  "Jump-Tree-Pos-List state.")
-
 (defvar jump-tree-pos-list-marker nil
   "Record the `point-marker' before command.")
 
@@ -605,8 +602,7 @@ changes within the current region."
   "Internal position function.
 A numeric ARG serves as a repeat count."
   (setq deactivate-mark t)
-  (let ((jump-tree-in-progress t)
-        pos current)
+  (let (pos current)
     ;; transfer entries accumulated in `jump-tree-pos-list' to
     ;; `jump-tree-pos-tree'
 
@@ -642,8 +638,7 @@ changes within the current region."
   "Internal jump-next function.
 A numeric ARG serves as a repeat count."
   (setq deactivate-mark t)
-  (let ((jump-tree-in-progress t)
-        pos current)
+  (let (pos current)
     ;; transfer entries accumulated in `jump-tree-pos-list' to
     ;; `jump-tree-pos-tree'
     (jump-tree-pos-list-transfer-to-tree)
