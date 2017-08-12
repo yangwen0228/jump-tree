@@ -1169,17 +1169,20 @@ A numeric ARG serves as a repeat count."
   (unwind-protect
       (with-current-buffer jump-tree-visualizer-parent-buffer
         (remove-hook 'before-change-functions 'jump-tree-kill-visualizer t))
-    (let ((parent (marker-buffer
-                   (cdr (jump-tree-node-position
-                         (jump-tree-current jump-tree-pos-tree)))))
-          window)
+    (let* ((parent jump-tree-visualizer-parent-buffer)
+           (marker (cdr (jump-tree-node-position
+                         (jump-tree-current jump-tree-pos-tree))))
+           (buff (if (markerp marker)
+                     (marker-buffer marker)
+                   parent))
+           window)
       ;; kill visualizer buffer
       (kill-buffer nil)
       ;; switch back to parent buffer
       (unwind-protect
-          (if (setq window (get-buffer-window parent))
+          (if (setq window (get-buffer-window buff))
               (select-window window)
-            (switch-to-buffer parent))))))
+            (switch-to-buffer buff))))))
 
 (defun jump-tree-visualizer-abort ()
   "Quit the jump-tree visualizer and return buffer to original state."
@@ -1268,7 +1271,7 @@ A numeric ARG serves as a repeat count."
   (scroll-right (or arg 1) t))
 
 (defun jump-tree-visualizer-scroll-up (&optional arg)
-    "The scroll the window contents up.
+  "The scroll the window contents up.
 A numeric ARG serves as a repeat count."
   (interactive "P")
   (unless (eq major-mode 'jump-tree-visualizer-mode)

@@ -32,6 +32,13 @@
 ;; node or parent node, and a next node represents a list of child nodes.
 ;; And we use a banch number to represents the index of the child nodes.
 
+;; Priority:
+;; 1. skip "jump-tree" prefix commands.
+;; 2. skip buffer in skip-list.
+;; 3. record when command in `jump-tree-pos-list-record-commands'.
+;; 4. record when offset exceeding threshold.
+;; 5. record when switch-buffer.
+
 ;;; Code:
 
 (eval-when-compile (require 'cl))
@@ -60,7 +67,7 @@
 
 (defgroup jump-tree nil
   "Tree jump-prev/jump-next."
-  :group 'jump-tree)
+  :group 'convenience)
 
 (defvar jump-tree-pos-list '()
   "Jump history list, contain POSITION entries '(file-name . marker).")
@@ -70,6 +77,26 @@
 
 (defvar jump-tree-in-progress nil
   "Jump-Tree-Pos-List state.")
+
+(defvar jump-tree-pos-list-marker nil
+  "Record the `point-marker' before command.")
+
+(defcustom jump-tree-pos-list-offset-threshold 200
+  "Min offset to record a position in the list.
+The offset is the point after command executed to the point before execution."
+  :type 'integer
+  :group 'jump-tree)
+
+(defcustom jump-tree-pos-list-switch-buffer t
+  "Whether record the position when switch buffer."
+  :type 'boolean
+  :group 'jump-tree)
+
+
+(defcustom jump-tree-pos-list-skip-buffers '("*Messages*")
+  "Skip the buffers when switch to the buffer in this list."
+  :type 'list
+  :group 'jump-tree)
 
 (defcustom jump-tree-pos-list-limit 40
   "Max length of ‘jump-tree-pos-list’."
@@ -81,7 +108,13 @@
   :type 'integer
   :group 'jump-tree)
 
-(defcustom jump-tree-pos-list-hook-commands
+(defcustom jump-tree-pos-list-skip-commands
+  '(self-insert-command)
+  "Commands to skip."
+  :type 'list
+  :group 'jump-tree)
+
+(defcustom jump-tree-pos-list-record-commands
   '(beginning-of-buffer
     end-of-buffer backward-up-list
     beginning-of-defun end-of-defun
@@ -140,13 +173,46 @@
         (unless (jump-tree-pos-list-same-position? position)
           (jump-tree-pos-list-push position)))))
 
-(defun jump-tree-pos-list-command-hook ()
-  "Pre command hook that call `jump-tree-pos-list-set' when registerd command hook called."
-  (when (and (not jump-tree-in-progress)
-             (memq this-command jump-tree-pos-list-hook-commands))
-    (jump-tree-pos-list-set)))
+(defun jump-tree-pos-list-pre-command ()
+  "Pre command hook, set point-marker before jump."
+  (if (memq this-command jump-tree-pos-list-skip-commands)
+      (setq jump-tree-pos-list-marker nil)
+    (setq jump-tree-pos-list-marker (point-marker))))
 
-(add-hook 'pre-command-hook 'jump-tree-pos-list-command-hook)
+(defun jump-tree-pos-list-post-command ()
+  "Post command hook that call `jump-tree-pos-list-set' to add position items.
+Priority:
+1. skip \"jump-tree\" prefix commands.
+2. skip buffer in skip-list.
+3. record when command in `jump-tree-pos-list-record-commands'.
+4. record when offset exceeding threshold.
+5. record when switch-buffer."
+  (when jump-tree-pos-list-marker
+    (let* ((cur-buffer (current-buffer))
+           (cur-buffer-name (string-trim (buffer-name cur-buffer)))
+           (prev-buffer (marker-buffer jump-tree-pos-list-marker))
+           (prev-buffer-name (string-trim (buffer-name prev-buffer))))
+      (when (and
+             ;; must skip jump-tree commands.
+             (not (string-prefix-p "jump-tree" (symbol-name this-command)))
+             ;; skip when point in skip-buffers.
+             ;; cur-buffer point is not correct, maybe jump to skip-buffers.
+             (not (member prev-buffer-name jump-tree-pos-list-skip-buffers))
+             (or
+              ;; this-command in the hook commands list
+              (memq this-command jump-tree-pos-list-record-commands)
+
+              ;; if in the same buffer, and offset exceed the threshold
+              (if (eq cur-buffer prev-buffer)
+                  (> (abs (- (point)
+                             (marker-position jump-tree-pos-list-marker)))
+                     jump-tree-pos-list-offset-threshold)
+                ;; switch buffer enabled or not
+                jump-tree-pos-list-switch-buffer)))
+        (jump-tree-pos-list-set)))))
+
+(add-hook 'pre-command-hook 'jump-tree-pos-list-pre-command)
+(add-hook 'post-command-hook 'jump-tree-pos-list-post-command)
 
 
 ;;; =====================================================================
@@ -345,6 +411,18 @@ This function will remove these invalid entries."
                          (not (marker-buffer (cdr position)))))
                    jump-tree-pos-list)))
 
+(defun jump-tree-pos-list-first-diff-position (tree-position)
+  "Get the first different position from `jump-tree-pos-list'."
+  (let* ((tree-marker (cdr tree-position))
+         (position (pop jump-tree-pos-list))
+         (marker (cdr position)))
+    (if (not (markerp tree-marker))
+        position
+      (if (and (eq (marker-buffer marker) (marker-buffer tree-marker))
+               (eq (marker-position marker) (marker-position tree-marker)))
+          (jump-tree-pos-list-first-diff-position tree-position)
+        position))))
+
 (defun jump-tree-pos-list-transfer-to-tree ()
   "Transfer entries accumulated in `jump-tree-pos-list' to `jump-tree-pos-tree'."
 
@@ -360,8 +438,10 @@ This function will remove these invalid entries."
   (when jump-tree-pos-list
     ;; create new node from first changeset in `jump-tree-pos-list', save old
     ;; `jump-tree-pos-tree' current node, and make new node the current node
-    (let* ((node (jump-tree-make-node nil (pop jump-tree-pos-list)))
-           (splice (jump-tree-current jump-tree-pos-tree))
+    (let* ((splice (jump-tree-current jump-tree-pos-tree))
+           (cur-position (jump-tree-node-position splice))
+           (node (jump-tree-make-node
+                  nil (jump-tree-pos-list-first-diff-position cur-position)))
            (count 1))
       (setf (jump-tree-current jump-tree-pos-tree) node)
       ;; grow tree fragment backwards
@@ -529,8 +609,6 @@ A numeric ARG serves as a repeat count."
         pos current)
     ;; transfer entries accumulated in `jump-tree-pos-list' to
     ;; `jump-tree-pos-tree'
-    (when jump-tree-pos-list
-      (jump-tree-pos-list-set))
 
     (jump-tree-pos-list-transfer-to-tree)
     (dotimes (i (or (and (numberp arg) (prefix-numeric-value arg)) 1))
@@ -662,7 +740,7 @@ Argument is a character, naming the register."
   (set-register
    register (registerv-make
              (jump-tree-make-register-data
-              (current-buffer) (jump-tree-current jump-tree-pos-tree))
+              (cur-buffer) (jump-tree-current jump-tree-pos-tree))
              :print-func 'jump-tree-register-data-print-func))
   ;; record REGISTER in current node, for visualizer
   (setf (jump-tree-node-register (jump-tree-current jump-tree-pos-tree))
@@ -683,7 +761,7 @@ Argument is a character, naming the register."
       (user-error "No position information in this buffer"))
      ((not (jump-tree-register-data-p data))
       (user-error "Register doesn't contain jump-tree state"))
-     ((not (eq (current-buffer) (jump-tree-register-data-buffer data)))
+     ((not (eq (cur-buffer) (jump-tree-register-data-buffer data)))
       (user-error "Register contains jump-tree state for a different buffer")))
     ;; transfer entries accumulated in `jump-tree-pos-list' to `jump-tree-pos-tree'
     (jump-tree-pos-list-transfer-to-tree)
