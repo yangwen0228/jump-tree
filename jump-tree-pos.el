@@ -436,20 +436,22 @@ This function will remove these invalid entries."
     ;; `jump-tree-pos-tree' current node, and make new node the current node
     (let* ((splice (jump-tree-current jump-tree-pos-tree))
            (cur-position (jump-tree-node-position splice))
-           (node (jump-tree-make-node
-                  nil (jump-tree-pos-list-first-diff-position cur-position)))
-           (count 1))
-      (setf (jump-tree-current jump-tree-pos-tree) node)
-      ;; grow tree fragment backwards
-      (while jump-tree-pos-list
-        (setq node
-              (jump-tree-grow-backwards node (pop jump-tree-pos-list)))
-        (incf count))
-      ;; build a new branch, number 0.
-      (setf (jump-tree-node-previous node) splice)
-      (push node (jump-tree-node-next splice))
-      (setf (jump-tree-node-branch splice) 0)
-      (incf (jump-tree-count jump-tree-pos-tree) count))
+           (position (jump-tree-pos-list-first-diff-position cur-position))
+           (count 1)
+           node)
+      (when position
+        (setq node (jump-tree-make-node nil position))
+        (setf (jump-tree-current jump-tree-pos-tree) node)
+        ;; grow tree fragment backwards
+        (while jump-tree-pos-list
+          (setq node
+                (jump-tree-grow-backwards node (pop jump-tree-pos-list)))
+          (incf count))
+        ;; build a new branch, number 0.
+        (setf (jump-tree-node-previous node) splice)
+        (push node (jump-tree-node-next splice))
+        (setf (jump-tree-node-branch splice) 0)
+        (incf (jump-tree-count jump-tree-pos-tree) count)))
     ;; discard position history if necessary
     (jump-tree-discard-history)))
 
