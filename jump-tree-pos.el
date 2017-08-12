@@ -412,8 +412,10 @@ This function will remove these invalid entries."
          (marker (cdr position)))
     (if (not (markerp tree-marker))
         position
-      (if (and (eq (marker-buffer marker) (marker-buffer tree-marker))
-               (eq (marker-position marker) (marker-position tree-marker)))
+      (if (and
+           (markerp marker)
+           (eq (marker-buffer marker) (marker-buffer tree-marker))
+           (eq (marker-position marker) (marker-position tree-marker)))
           (jump-tree-pos-list-first-diff-position tree-position)
         position))))
 
