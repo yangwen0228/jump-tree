@@ -78,23 +78,6 @@
 (defvar jump-tree-pos-list-marker nil
   "Record the `point-marker' before command.")
 
-(defcustom jump-tree-pos-list-offset-threshold 200
-  "Min offset to record a position in the list.
-The offset is the point after command executed to the point before execution."
-  :type 'integer
-  :group 'jump-tree)
-
-(defcustom jump-tree-pos-list-switch-buffer t
-  "Whether record the position when switch buffer."
-  :type 'boolean
-  :group 'jump-tree)
-
-
-(defcustom jump-tree-pos-list-skip-buffers '("*Messages*")
-  "Skip the buffers when switch to the buffer in this list."
-  :type 'list
-  :group 'jump-tree)
-
 (defcustom jump-tree-pos-list-limit 40
   "Max length of ‘jump-tree-pos-list’."
   :type 'integer
@@ -105,9 +88,13 @@ The offset is the point after command executed to the point before execution."
   :type 'integer
   :group 'jump-tree)
 
-(defcustom jump-tree-pos-list-skip-commands
-  '(self-insert-command)
+(defcustom jump-tree-pos-list-skip-commands '(self-insert-command)
   "Commands to skip."
+  :type 'list
+  :group 'jump-tree)
+
+(defcustom jump-tree-pos-list-skip-buffers '("*Messages*")
+  "Skip the buffers when switch to the buffer in this list."
   :type 'list
   :group 'jump-tree)
 
@@ -129,6 +116,17 @@ The offset is the point after command executed to the point before execution."
     isearch-forward)
   "Commands to hook."
   :type 'list
+  :group 'jump-tree)
+
+(defcustom jump-tree-pos-list-offset-threshold 200
+  "Min offset to record a position in the list.
+The offset is the point after command executed to the point before execution."
+  :type 'integer
+  :group 'jump-tree)
+
+(defcustom jump-tree-pos-list-switch-buffer t
+  "Whether record the position when switch buffer."
+  :type 'boolean
   :group 'jump-tree)
 
 (defcustom jump-tree-mode-lighter " Jump-Tree"
@@ -171,42 +169,41 @@ The offset is the point after command executed to the point before execution."
           (jump-tree-pos-list-push position)))))
 
 (defun jump-tree-pos-list-pre-command ()
-  "Pre command hook, set point-marker before jump."
-  (if (memq this-command jump-tree-pos-list-skip-commands)
+  "Pre command hook, set point-marker before jump.
+Skip when command name prefix is \"jump-tree\", or in the
+`jump-tree-pos-list-skip-commands'.
+Priority:
+1. skip skip command in `jump-tree-pos-list-skip-commands`.
+2. skip when buffer in `jump-tree-pos-list-skip-buffers`.
+3. skip the commands whose prefix is \"jump-tree\"."
+
+  (if (or (memq this-command jump-tree-pos-list-skip-commands)
+          (member (string-trim (buffer-name (current-buffer)))
+                  jump-tree-pos-list-skip-buffers)
+          (string-prefix-p "jump-tree" (symbol-name this-command)))
       (setq jump-tree-pos-list-marker nil)
     (setq jump-tree-pos-list-marker (point-marker))))
 
 (defun jump-tree-pos-list-post-command ()
   "Post command hook that call `jump-tree-pos-list-set' to add position items.
 Priority:
-1. skip \"jump-tree\" prefix commands.
-2. skip buffer in skip-list.
-3. record when command in `jump-tree-pos-list-record-commands'.
-4. record when offset exceeding threshold.
-5. record when switch-buffer."
-  (when jump-tree-pos-list-marker
-    (let* ((cur-buffer (current-buffer))
-           (cur-buffer-name (string-trim (buffer-name cur-buffer)))
-           (prev-buffer (marker-buffer jump-tree-pos-list-marker))
-           (prev-buffer-name (string-trim (buffer-name prev-buffer))))
-      (when (and
-             ;; must skip jump-tree commands.
-             (not (string-prefix-p "jump-tree" (symbol-name this-command)))
-             ;; skip when point in skip-buffers.
-             ;; cur-buffer point is not correct, maybe jump to skip-buffers.
-             (not (member prev-buffer-name jump-tree-pos-list-skip-buffers))
-             (or
-              ;; this-command in the hook commands list
-              (memq this-command jump-tree-pos-list-record-commands)
+1. record when command in `jump-tree-pos-list-record-commands'.
+2. record when offset exceeding threshold.
+3. record when switch-buffer."
 
-              ;; if in the same buffer, and offset exceed the threshold
-              (if (eq cur-buffer prev-buffer)
-                  (> (abs (- (point)
-                             (marker-position jump-tree-pos-list-marker)))
-                     jump-tree-pos-list-offset-threshold)
-                ;; switch buffer enabled or not
-                jump-tree-pos-list-switch-buffer)))
-        (jump-tree-pos-list-set)))))
+  (when jump-tree-pos-list-marker
+    (when (or
+           ;; this-command in the hook commands list
+           (memq this-command jump-tree-pos-list-record-commands)
+
+           ;; if in the same buffer, and offset exceed the threshold
+           (if (eq (current-buffer) (marker-buffer jump-tree-pos-list-marker))
+               (> (abs
+                   (- (point) (marker-position jump-tree-pos-list-marker)))
+                  jump-tree-pos-list-offset-threshold)
+             ;; switch buffer enabled or not
+             jump-tree-pos-list-switch-buffer))
+      (jump-tree-pos-list-set))))
 
 (add-hook 'pre-command-hook 'jump-tree-pos-list-pre-command)
 (add-hook 'post-command-hook 'jump-tree-pos-list-post-command)
