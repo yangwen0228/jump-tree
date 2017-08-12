@@ -6,10 +6,13 @@ jump-tree is an undo-tree like jumping implementation, so that we can jump back 
 
 ## Installation
 You can install from [melpa](https://melpa.org/#/jump-tree) ,or
-You can install manually from github;
+
+You can install manually from github:
+
 `git clone https://github.com/yangwen0228/jump-tree.git`
 
 Then add this to your init:
+
 `(require 'jump-tree)`
 
 ## Usage
