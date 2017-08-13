@@ -141,9 +141,14 @@ The offset is the point after command executed to the point before execution."
 (defun jump-tree-pos-list-jump (position)
   "Do jump to target file and point from POSITION."
   (let ((file-path (car position))
-        (marker (cdr position)))
+        (marker (cdr position))
+        buff)
     (when (and (markerp marker) (marker-buffer marker))
-      (find-file file-path)
+      (setq buff (marker-buffer marker))
+      (unwind-protect
+          (if (setq window (get-buffer-window buff))
+              (select-window window)
+            (switch-to-buffer buff)))
       (goto-char marker))))
 
 (defun jump-tree-pos-list-push (position)
