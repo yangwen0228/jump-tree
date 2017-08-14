@@ -616,7 +616,12 @@ Within the jump-tree visualizer, the following keys are available:
   nil                       ; init value
   jump-tree-mode-lighter    ; lighter
   jump-tree-map             ; keymap
-  (when (not jump-tree-mode)
+  (if jump-tree-mode
+      (progn
+        (add-hook 'pre-command-hook  'jump-tree-pos-list-pre-command)
+        (add-hook 'post-command-hook 'jump-tree-pos-list-post-command))
+    (remove-hook 'pre-command-hook  'jump-tree-pos-list-pre-command)
+    (remove-hook 'post-command-hook 'jump-tree-pos-list-post-command)
     (setq jump-tree-pos-list nil)
     (setq jump-tree-pos-tree nil)))
 

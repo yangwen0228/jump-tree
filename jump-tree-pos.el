@@ -210,9 +210,6 @@ Priority:
              jump-tree-pos-list-switch-buffer))
       (jump-tree-pos-list-set))))
 
-(add-hook 'pre-command-hook 'jump-tree-pos-list-pre-command)
-(add-hook 'post-command-hook 'jump-tree-pos-list-post-command)
-
 
 ;;; =====================================================================
 ;;;                     jump-tree data structure
