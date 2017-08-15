@@ -99,7 +99,8 @@
   :group 'jump-tree)
 
 (defcustom jump-tree-pos-list-record-commands
-  '(beginning-of-buffer
+  '(save-buffer
+    beginning-of-buffer
     end-of-buffer backward-up-list
     beginning-of-defun end-of-defun
     unimacs-move-beginning-of-line unimacs-move-end-of-line
