@@ -608,7 +608,7 @@ changes within the current region."
   "Internal position function.
 A numeric ARG serves as a repeat count."
   (setq deactivate-mark t)
-  (let (pos current)
+  (let (pos current marker)
     ;; transfer entries accumulated in `jump-tree-pos-list' to
     ;; `jump-tree-pos-tree'
 
@@ -616,10 +616,14 @@ A numeric ARG serves as a repeat count."
     (dotimes (i (or (and (numberp arg) (prefix-numeric-value arg)) 1))
       ;; check if at top of position tree
       (setq current (jump-tree-current jump-tree-pos-tree))
-      (unless (jump-tree-node-previous current)
-        (user-error "No further jump-prev information"))
-      (setq current (jump-tree-node-previous current))
-      (setf (jump-tree-current jump-tree-pos-tree) current)
+      ;; if point position is the same to the tree current position,
+      ;; goto the previous node. Otherwise, goto the current tree node.
+      (setq marker (cdr (jump-tree-node-position current)))
+      (when (or (not (markerp marker)) (= (point) (marker-position marker)))
+          (unless (jump-tree-node-previous current)
+            (user-error "No further jump-prev information"))
+        (setq current (jump-tree-node-previous current))
+        (setf (jump-tree-current jump-tree-pos-tree) current))
 
       (jump-tree-pos-list-jump (jump-tree-node-position current)))))
 
