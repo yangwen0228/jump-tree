@@ -185,7 +185,9 @@ Priority:
   (if (or (memq this-command jump-tree-pos-list-skip-commands)
           (member (string-trim (buffer-name (current-buffer)))
                   jump-tree-pos-list-skip-buffers)
-          (string-prefix-p "jump-tree" (symbol-name this-command)))
+          (and
+           (symbolp this-command)
+           (string-prefix-p "jump-tree" (symbol-name this-command))))
       (setq jump-tree-pos-list-marker nil)
     (setq jump-tree-pos-list-marker (point-marker))))
 
