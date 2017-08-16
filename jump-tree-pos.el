@@ -642,8 +642,9 @@ A numeric ARG serves as a repeat count."
             (when (markerp marker)
               (setq buf (marker-buffer marker)
                     pos (marker-position marker))
-              (when buf (with-current-buffer buf
-                          (= (point) pos)))))
+              (when (and buf (eq buf (current-buffer)))
+                (with-current-buffer buf
+                  (= (point) pos)))))
       (if (and jump-tree-ex-mode (not at-node))
           (progn
             (jump-tree-pos-list-set)
