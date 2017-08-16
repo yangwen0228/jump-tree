@@ -75,8 +75,13 @@
 (defvar jump-tree-pos-tree nil
   "Tree of position entries globally.")
 
-(defvar jump-tree-pos-list-marker nil
-  "Record the `point-marker' before command.")
+(defvar jump-tree-pos-list-position nil
+  "Record the `position' before executing command.")
+
+(defcustom jump-tree-ex-mode t
+  "Whether record the position, when `jump-prev'."
+  :type 'boolean
+  :group 'jump-tree)
 
 (defcustom jump-tree-pos-list-limit 40
   "Max length of ‘jump-tree-pos-list’."
@@ -160,19 +165,30 @@ The offset is the point after command executed to the point before execution."
 
 (defun jump-tree-pos-list-same-position? (position)
   "Check whether current POSITION is equal with the last POSITION in list."
-  (let ((new-point (cdr position))
-        (top-point (cdar jump-tree-pos-list)))
-    (cond ((not new-point) nil)
-          ((not top-point) nil)
-          ((eq (marker-position new-point) (marker-position top-point)) 't))))
+  (let ((marker (cdr position))
+        (latest-marker (cdar jump-tree-pos-list)))
+    (cond ((not (markerp marker)) nil)
+          ((not (markerp latest-marker)) nil)
+          ((and
+            (eq (marker-buffer marker) (marker-buffer latest-marker))
+            (eq (marker-position marker) (marker-position latest-marker)))
+           't))))
 
-(defun jump-tree-pos-list-set ()
-  "The record data structure is (file-name . position)."
-  (interactive)
+(defun jump-tree-pos-list-make-position ()
+  "Create a position: (file-name . position)."
   (if (buffer-file-name)
-      (let ((position (cons (buffer-file-name) (point-marker))))
-        (unless (jump-tree-pos-list-same-position? position)
-          (jump-tree-pos-list-push position)))))
+      (cons (buffer-file-name) (point-marker))))
+
+(defun jump-tree-pos-list-set (&optional position)
+  "If POSITION is given, add the position to the list.
+Otherwise, create a new position."
+  (interactive)
+  (unless position
+    (setq position (jump-tree-pos-list-make-position)))
+  (when (and
+         position
+         (not (jump-tree-pos-list-same-position? position)))
+    (jump-tree-pos-list-push position)))
 
 (defun jump-tree-pos-list-pre-command ()
   "Pre command hook, set point-marker before jump.
@@ -189,8 +205,8 @@ Priority:
           (and
            (symbolp this-command)
            (string-prefix-p "jump-tree" (symbol-name this-command))))
-      (setq jump-tree-pos-list-marker nil)
-    (setq jump-tree-pos-list-marker (point-marker))))
+      (setq jump-tree-pos-list-position nil)
+    (setq jump-tree-pos-list-position (jump-tree-pos-list-make-position))))
 
 (defun jump-tree-pos-list-post-command ()
   "Post command hook that call `jump-tree-pos-list-set' to add position items.
@@ -199,19 +215,21 @@ Priority:
 2. record when offset exceeding threshold.
 3. record when switch-buffer."
 
-  (when jump-tree-pos-list-marker
-    (when (or
-           ;; this-command in the hook commands list
-           (memq this-command jump-tree-pos-list-record-commands)
+  (when jump-tree-pos-list-position
+    (let ((marker (cdr jump-tree-pos-list-position)))
+      (when (or
+             ;; this-command in the hook commands list
+             (memq this-command jump-tree-pos-list-record-commands)
 
-           ;; if in the same buffer, and offset exceed the threshold
-           (if (eq (current-buffer) (marker-buffer jump-tree-pos-list-marker))
-               (> (abs
-                   (- (point) (marker-position jump-tree-pos-list-marker)))
-                  jump-tree-pos-list-offset-threshold)
-             ;; switch buffer enabled or not
-             jump-tree-pos-list-switch-buffer))
-      (jump-tree-pos-list-set))))
+             ;; if in the same buffer, and offset exceed the threshold
+             (if (eq (current-buffer) (marker-buffer marker))
+                 (> (abs
+                     (- (point) (marker-position marker)))
+                    jump-tree-pos-list-offset-threshold)
+               ;; switch buffer enabled or not
+               jump-tree-pos-list-switch-buffer))
+        ;; add the position before command execution.
+        (jump-tree-pos-list-set jump-tree-pos-list-position)))))
 
 
 ;;; =====================================================================
@@ -600,15 +618,13 @@ changes within the current region."
   ;; throw error if position is disabled in buffer
   (when (eq jump-tree-pos-list t)
     (user-error "No position information in this buffer"))
-  (jump-tree-jump-prev-1 arg)
-  ;; inform user if at branch point
-  (when (> (jump-tree-num-branches) 1) (message "Jump-Prev branch point!")))
+  (jump-tree-jump-prev-1 arg))
 
 (defun jump-tree-jump-prev-1 (&optional arg)
   "Internal position function.
 A numeric ARG serves as a repeat count."
   (setq deactivate-mark t)
-  (let (pos current marker)
+  (let (current marker buf pos at-node)
     ;; transfer entries accumulated in `jump-tree-pos-list' to
     ;; `jump-tree-pos-tree'
 
@@ -616,12 +632,23 @@ A numeric ARG serves as a repeat count."
     (dotimes (i (or (and (numberp arg) (prefix-numeric-value arg)) 1))
       ;; check if at top of position tree
       (setq current (jump-tree-current jump-tree-pos-tree))
+      (unless (jump-tree-node-previous current)
+        (user-error "No further jump-prev information"))
+
       ;; if point position is the same to the tree current position,
       ;; goto the previous node. Otherwise, goto the current tree node.
       (setq marker (cdr (jump-tree-node-position current)))
-      (when (or (not (markerp marker)) (= (point) (marker-position marker)))
-          (unless (jump-tree-node-previous current)
-            (user-error "No further jump-prev information"))
+      (setq at-node
+            (when (markerp marker)
+              (setq buf (marker-buffer marker)
+                    pos (marker-position marker))
+              (when buf (with-current-buffer buf
+                          (= (point) pos)))))
+      (if (and jump-tree-ex-mode (not at-node))
+          (progn
+            (jump-tree-pos-list-set)
+            (jump-tree-pos-list-transfer-to-tree)
+            (setf (jump-tree-current jump-tree-pos-tree) current))
         (setq current (jump-tree-node-previous current))
         (setf (jump-tree-current jump-tree-pos-tree) current))
 
@@ -640,9 +667,7 @@ changes within the current region."
   ;; throw error if position is disabled in buffer
   (when (eq jump-tree-pos-list t)
     (user-error "No position information in this buffer"))
-  (jump-tree-jump-next-1 arg)
-  ;; inform user if at branch point
-  (when (> (jump-tree-num-branches) 1) (message "Jump-Prev branch point!")))
+  (jump-tree-jump-next-1 arg))
 
 (defun jump-tree-jump-next-1 (&optional arg)
   "Internal jump-next function.
