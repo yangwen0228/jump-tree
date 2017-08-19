@@ -624,7 +624,7 @@ TYPE can be 'buffer 'in-current-buffer 'normal."
 
       ;; if point position is the same to the tree current position,
       ;; goto the previous node. Otherwise, goto the current tree node.
-s      (if (jump-tree-at-node current)
+      (if (jump-tree-at-node current)
           (setq current (jump-tree-node-previous current))
         (when (and jump-tree-ex-mode (not (eq type 'buffer)))
           (jump-tree-pos-list-set)
