@@ -93,7 +93,8 @@
   :type 'integer
   :group 'jump-tree)
 
-(defcustom jump-tree-pos-list-skip-commands '(self-insert-command)
+(defcustom jump-tree-pos-list-skip-commands
+  '(self-insert-command helm-M-x execute-extended-command)
   "Commands to skip."
   :type 'list
   :group 'jump-tree)
@@ -265,47 +266,26 @@ Priority:
   (let ((len (length (jump-tree-make-node nil nil))))
     `(and (vectorp ,n) (= (length ,n) ,len))))
 
-(defstruct
-    (jump-tree-position-data
-     (:type vector)   ; create unnamed struct
-     (:constructor nil)
-     (:constructor jump-tree-make-position-data
-                   (&optional file-path marker))
-     (:copier nil))
-  file-path marker)
+(defun jump-tree-node-buffer (node)
+  "Fetch NODE's buffer."
+  (let ((marker (cdr (jump-tree-node-position node))))
+    (when (markerp marker)
+      (marker-buffer marker))))
 
-(defmacro jump-tree-position-data-p (pos)
-  "Check POS is whether a `jump-tree-position-data'."
-  (let ((len (length (jump-tree-make-position-data))))
-    `(and (vectorp ,pos) (= (length ,pos) ,len))))
+(defun jump-tree-node-point (node)
+  "Fetch NODE's buffer."
+  (let ((marker (cdr (jump-tree-node-position node))))
+    (when (markerp marker)
+      (marker-position marker))))
 
-(defmacro jump-tree-node-file-path (node)
-  "Fetch FILE-PATH data from NODE's meta-data field :position."
-  `(let ((pos (plist-get (jump-tree-node-meta-data ,node) :position)))
-     (when (jump-tree-position-data-p pos)
-       (jump-tree-position-data-file-path pos))))
+(defun jump-tree-at-node (node)
+  "Determine whether NODE point is at a tree node."
+  (let ((buf (jump-tree-node-buffer node))
+        (pos (jump-tree-node-point node)))
 
-(defmacro jump-tree-node-marker (node)
-  "Fetch MARKER data from NODE's meta-data field :position."
-  `(let ((pos (plist-get (jump-tree-node-meta-data ,node) :position)))
-     (when (jump-tree-position-data-p pos)
-       (jump-tree-position-data-marker pos))))
-
-(defsetf jump-tree-node-file-path (node) (val)
-  `(let ((pos (plist-get (jump-tree-node-meta-data ,node) :position)))
-     (unless (jump-tree-position-data-p pos)
-       (setf (jump-tree-node-meta-data ,node)
-             (plist-put (jump-tree-node-meta-data ,node) :position
-                        (setq pos (jump-tree-make-position-data)))))
-     (setf (jump-tree-position-data-file-path pos) ,val)))
-
-(defsetf jump-tree-node-marker (node) (val)
-  `(let ((pos (plist-get (jump-tree-node-meta-data ,node) :position)))
-     (unless (jump-tree-position-data-p pos)
-       (setf (jump-tree-node-meta-data ,node)
-             (plist-put (jump-tree-node-meta-data ,node) :position
-                        (setq pos (jump-tree-make-position-data)))))
-     (setf (jump-tree-position-data-marker pos) ,val)))
+    (when (and buf (eq buf (current-buffer)))
+      (with-current-buffer buf
+        (= (point) pos)))))
 
 (defstruct
     (jump-tree-register-data
@@ -606,12 +586,7 @@ Set by `jump-tree-pos-tree-limit'."
 
 (defun jump-tree-jump-prev (&optional arg)
   "Jump to the previous position.
-Repeat this command to position more changes.
-A numeric ARG serves as a repeat count.
-In Transient Mark mode when the mark is active, only position changes
-within the current region.  Similarly, when not in Transient Mark
-mode, just \\[universal-argument] as an argument limits position to
-changes within the current region."
+A numeric ARG serves as a repeat count."
   (interactive "*P")
   (unless jump-tree-mode
     (user-error "`jump-tree-mode' not enabled in buffer"))
@@ -620,11 +595,23 @@ changes within the current region."
     (user-error "No position information in this buffer"))
   (jump-tree-jump-prev-1 arg))
 
-(defun jump-tree-jump-prev-1 (&optional arg)
-  "Internal position function.
+(defun jump-tree-buffer-prev (&optional arg)
+  "Jump to the previous position.
 A numeric ARG serves as a repeat count."
-  (setq deactivate-mark t)
-  (let (current marker buf pos at-node)
+  (interactive "*P")
+  (unless jump-tree-mode
+    (user-error "`jump-tree-mode' not enabled in buffer"))
+  ;; throw error if position is disabled in buffer
+  (when (eq jump-tree-pos-list t)
+    (user-error "No position information in this buffer"))
+  (jump-tree-jump-prev-1 arg 'buffer))
+
+(defun jump-tree-jump-prev-1 (&optional arg type)
+  "Internal position function.
+A numeric ARG serves as a repeat count.
+TYPE can be 'buffer 'in-current-buffer 'normal."
+  (deactivate-mark)
+  (let (current current1)
     ;; transfer entries accumulated in `jump-tree-pos-list' to
     ;; `jump-tree-pos-tree'
 
@@ -637,21 +624,12 @@ A numeric ARG serves as a repeat count."
 
       ;; if point position is the same to the tree current position,
       ;; goto the previous node. Otherwise, goto the current tree node.
-      (setq marker (cdr (jump-tree-node-position current)))
-      (setq at-node
-            (when (markerp marker)
-              (setq buf (marker-buffer marker)
-                    pos (marker-position marker))
-              (when (and buf (eq buf (current-buffer)))
-                (with-current-buffer buf
-                  (= (point) pos)))))
-      (if (and jump-tree-ex-mode (not at-node))
-          (progn
-            (jump-tree-pos-list-set)
-            (jump-tree-pos-list-transfer-to-tree)
-            (setf (jump-tree-current jump-tree-pos-tree) current))
-        (setq current (jump-tree-node-previous current))
-        (setf (jump-tree-current jump-tree-pos-tree) current))
+s      (if (jump-tree-at-node current)
+          (setq current (jump-tree-node-previous current))
+        (when (and jump-tree-ex-mode (not (eq type 'buffer)))
+          (jump-tree-pos-list-set)
+          (jump-tree-pos-list-transfer-to-tree)))
+      (setf (jump-tree-current jump-tree-pos-tree) current)
 
       (jump-tree-pos-list-jump (jump-tree-node-position current)))))
 

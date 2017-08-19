@@ -111,18 +111,12 @@ in visualizer."
 
 (defvar jump-tree-visualizer-parent-buffer nil
   "Parent buffer in visualizer.")
-(put 'jump-tree-visualizer-parent-buffer 'permanent-local t)
-(make-variable-buffer-local 'jump-tree-visualizer-parent-buffer)
 
 (defvar jump-tree-visualizer-parent-mtime nil
   "Store modification time of parent buffer's file, if any.")
-(put 'jump-tree-visualizer-parent-mtime 'permanent-local t)
-(make-variable-buffer-local 'jump-tree-visualizer-parent-mtime)
 
 (defvar jump-tree-visualizer-spacing nil
   "Store current horizontal spacing needed for drawing jump-tree.")
-(put 'jump-tree-visualizer-spacing 'permanent-local t)
-(make-variable-buffer-local 'jump-tree-visualizer-spacing)
 
 (defsubst jump-tree-visualizer-calculate-spacing ()
   "Calculate horizontal spacing required for drawing tree with current settings."
@@ -132,21 +126,13 @@ in visualizer."
 
 ;; holds node that was current when visualizer was invoked
 (defvar jump-tree-visualizer-initial-node nil)
-(put 'jump-tree-visualizer-initial-node 'permanent-local t)
-(make-variable-buffer-local 'jump-tree-visualizer-initial-node)
 
 ;; holds currently selected node in visualizer selection mode
 (defvar jump-tree-visualizer-selected-node nil)
-(put 'jump-tree-visualizer-selected-node 'permanent-local t)
-(make-variable-buffer-local 'jump-tree-visualizer-selected)
 
 ;; used to store nodes at edge of currently drawn portion of tree
 (defvar jump-tree-visualizer-needs-extending-down nil)
-(put 'jump-tree-visualizer-needs-extending-down 'permanent-local t)
-(make-variable-buffer-local 'jump-tree-visualizer-needs-extending-down)
 (defvar jump-tree-visualizer-needs-extending-up nil)
-(put 'jump-tree-visualizer-needs-extending-up 'permanent-local t)
-(make-variable-buffer-local 'jump-tree-visualizer-needs-extending-up)
 
 ;; dynamically bound to t when jump-preving from visualizer, to inhibit
 ;; `jump-tree-kill-visualizer' hook function in parent buffer
@@ -1085,6 +1071,7 @@ A numeric ARG serves as a repeat count."
           (inhibit-read-only t))
       (jump-tree-draw-node old))
     ;; position in parent buffer
+    (setq jump-tree-visualizer-parent-buffer (jump-tree-node-buffer old))
     (switch-to-buffer-other-window jump-tree-visualizer-parent-buffer)
     (deactivate-mark)
     (unwind-protect
@@ -1092,6 +1079,7 @@ A numeric ARG serves as a repeat count."
               (jump-tree-ex-mode nil))
           (jump-tree-jump-prev-1 arg))
       (setq current (jump-tree-current jump-tree-pos-tree))
+      (setq jump-tree-visualizer-parent-buffer (current-buffer))
       (switch-to-buffer-other-window jump-tree-visualizer-buffer-name)
       ;; when using lazy drawing, extend tree upwards as required
       (when jump-tree-visualizer-lazy-drawing
@@ -1117,6 +1105,7 @@ A numeric ARG serves as a repeat count."
     (unwind-protect
         (let ((jump-tree-inhibit-kill-visualizer t)) (jump-tree-jump-next-1 arg))
       (setq current (jump-tree-current jump-tree-pos-tree))
+      (setq jump-tree-visualizer-parent-buffer (current-buffer))
       (switch-to-buffer-other-window jump-tree-visualizer-buffer-name)
       ;; when using lazy drawing, extend tree downwards as required
       (when jump-tree-visualizer-lazy-drawing
@@ -1172,19 +1161,14 @@ A numeric ARG serves as a repeat count."
       (with-current-buffer jump-tree-visualizer-parent-buffer
         (remove-hook 'before-change-functions 'jump-tree-kill-visualizer t))
     (let* ((parent jump-tree-visualizer-parent-buffer)
-           (marker (cdr (jump-tree-node-position
-                         (jump-tree-current jump-tree-pos-tree))))
-           (buff (if (markerp marker)
-                     (marker-buffer marker)
-                   parent))
            window)
       ;; kill visualizer buffer
       (kill-buffer nil)
       ;; switch back to parent buffer
       (unwind-protect
-          (if (setq window (get-buffer-window buff))
+          (if (setq window (get-buffer-window parent))
               (select-window window)
-            (switch-to-buffer buff))))))
+            (switch-to-buffer parent))))))
 
 (defun jump-tree-visualizer-abort ()
   "Quit the jump-tree visualizer and return buffer to original state."
