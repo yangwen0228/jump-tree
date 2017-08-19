@@ -1075,8 +1075,7 @@ A numeric ARG serves as a repeat count."
     (switch-to-buffer-other-window jump-tree-visualizer-parent-buffer)
     (deactivate-mark)
     (unwind-protect
-        (let ((jump-tree-inhibit-kill-visualizer t)
-              (jump-tree-ex-mode nil))
+        (let ((jump-tree-inhibit-kill-visualizer t))
           (jump-tree-jump-prev-1 arg))
       (setq current (jump-tree-current jump-tree-pos-tree))
       (setq jump-tree-visualizer-parent-buffer (current-buffer))
@@ -1084,8 +1083,8 @@ A numeric ARG serves as a repeat count."
       ;; when using lazy drawing, extend tree upwards as required
       (when jump-tree-visualizer-lazy-drawing
         (jump-tree-expand-up old current))
-      ;; highlight new current node
-      (let ((inhibit-read-only t)) (jump-tree-draw-node current 'current)))))
+      ;; redraw the tree, jump-prev-1 may add new node.
+      (let ((inhibit-read-only t)) (jump-tree-draw-tree jump-tree-pos-tree)))))
 
 (defun jump-tree-visualize-jump-next (&optional arg)
   "Jump to the next position.
