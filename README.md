@@ -74,5 +74,9 @@ ganmacs's [jumplist](https://github.com/ganmacs/jumplist)
 
 ## Todo
 - [ ] When the records' buffers get closed, the position markers become invalid, now just ignore the positions. Clear the records? Or use a file to save the last point states, and restore the states?
+- [x] Support jump to prev/next buffers directly.
+- [ ] Support jump only in current buffer.
+- [ ] Rebuild a tree contains only buffers' last position in visualizer, jump to prev/next buffers directly.
+- [ ] Rebuild a tree contains positions only in current buffer in visualizer, jump only in current buffer.
 - [x] Last position is sometimes not reachable.
 
