@@ -386,7 +386,7 @@ that are already part of `jump-tree-pos-tree'."
 
 (defun jump-tree-index (node list)
   "Find the first occurrence of NODE in LIST.
-Return the index of the matching item, or nil of not found.
+Return the index of the matching item, or 0 of not found.
 Comparison is done with `eq'."
   (let ((i 0))
     (catch 'found
@@ -394,7 +394,7 @@ Comparison is done with `eq'."
                (when (eq node (car list)) (throw 'found i))
                (incf i)
                (setq list (cdr list))))
-      nil)))
+      0)))
 
 
 ;;; =====================================================================
@@ -584,6 +584,43 @@ Set by `jump-tree-pos-tree-limit'."
                   (> (jump-tree-count jump-tree-pos-tree) jump-tree-pos-tree-limit))
         (setq node (jump-tree-discard-node node))))))
 
+
+;;; =====================================================================
+;;;                jump between buffers functions
+(defun jump-tree-find-prev-buffer-node (node)
+  "Find the last node in the prev buffer before NODE."
+  (let ((current node)
+        (buff (current-buffer)))
+    (while (and (jump-tree-node-previous current)
+                (eq buff (jump-tree-node-buffer current)))
+      (setq current (jump-tree-node-previous current)))
+    (if (and (jump-tree-node-buffer current)
+             (not (eq buff (jump-tree-node-buffer current))))
+        current
+      node)))
+
+(defun jump-tree-find-next-buffer-node (node)
+  "Find the last node in the next buffer after NODE."
+  (let ((current node)
+        (buff (current-buffer))
+        next-buff next-node)
+    (while (and (jump-tree-node-next current)
+                (eq buff (jump-tree-node-buffer current)))
+      (setq current (nth (jump-tree-node-branch current)
+                         (jump-tree-node-next current))))
+    (setq next-buff (jump-tree-node-buffer current))
+    (if (eq next-buff buff)
+        node
+      (while (and (jump-tree-node-next current)
+                  (eq next-buff (jump-tree-node-buffer current)))
+        (setq current (nth (jump-tree-node-branch current)
+                         (jump-tree-node-next current)))))
+    (if (and (jump-tree-node-buffer current)
+             (not (eq next-buff (jump-tree-node-buffer current))))
+        (jump-tree-node-previous current)
+      current)))
+
+;; public APIs:
 (defun jump-tree-jump-prev (&optional arg)
   "Jump to the previous position.
 A numeric ARG serves as a repeat count."
@@ -596,7 +633,7 @@ A numeric ARG serves as a repeat count."
   (jump-tree-jump-prev-1 arg))
 
 (defun jump-tree-buffer-prev (&optional arg)
-  "Jump to the previous position.
+  "Jump to the previous buffer.
 A numeric ARG serves as a repeat count."
   (interactive "*P")
   (unless jump-tree-mode
@@ -631,6 +668,13 @@ TYPE can be 'buffer 'in-current-buffer 'normal."
           (jump-tree-pos-list-transfer-to-tree)))
       (setf (jump-tree-current jump-tree-pos-tree) current)
 
+      (pcase type
+        ('buffer
+         (setq current (jump-tree-find-prev-buffer-node current)))
+
+        ('in-current-buffer "not finished yet"))
+
+      (setf (jump-tree-current jump-tree-pos-tree) current)
       (jump-tree-pos-list-jump (jump-tree-node-position current)))))
 
 (defun jump-tree-jump-next (&optional arg)
@@ -648,7 +692,18 @@ changes within the current region."
     (user-error "No position information in this buffer"))
   (jump-tree-jump-next-1 arg))
 
-(defun jump-tree-jump-next-1 (&optional arg)
+(defun jump-tree-buffer-next (&optional arg)
+  "Jump to the next buffer.
+A numeric ARG serves as a repeat count."
+  (interactive "*P")
+  (unless jump-tree-mode
+    (user-error "`jump-tree-mode' not enabled in buffer"))
+  ;; throw error if position is disabled in buffer
+  (when (eq jump-tree-pos-list t)
+    (user-error "No position information in this buffer"))
+  (jump-tree-jump-next-1 arg 'buffer))
+
+(defun jump-tree-jump-next-1 (&optional arg type)
   "Internal jump-next function.
 A numeric ARG serves as a repeat count."
   (setq deactivate-mark t)
@@ -664,6 +719,9 @@ A numeric ARG serves as a repeat count."
       (setq current (nth (jump-tree-node-branch current)
                          (jump-tree-node-next current)))
       (setf (jump-tree-current jump-tree-pos-tree) current)
+      (pcase type
+        ('buffer
+         (setq current (jump-tree-find-next-buffer-node current))))
 
       (jump-tree-pos-list-jump (jump-tree-node-position current)))))
 
