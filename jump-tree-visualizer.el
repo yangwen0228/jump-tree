@@ -1229,6 +1229,33 @@ specifies `saved', and a negative prefix argument specifies
          (jump-tree-node-previous current)))
     ))
 
+(defun jump-tree-visualize-jump-next-to-x (&optional x)
+  "Jump-Next to last branch point, register, or saved state.
+If X is the symbol `branch', position to last branch point.  If X is
+the symbol `register', position to last register.  If X is the sumbol
+`saved', position to last saved state.  If X is null, position to first of
+these that's encountered.
+Interactively, a single \\[universal-argument] specifies
+`branch', a double \\[universal-argument] \\[universal-argument]
+specifies `saved', and a negative prefix argument specifies
+`register'."
+  (interactive "P")
+  (unless (eq major-mode 'jump-tree-visualizer-mode)
+    (user-error "`jump-tree-mode' not enabled in buffer"))
+  (when (and (called-interactively-p 'any) x)
+    (setq x (prefix-numeric-value x)
+          x (cond
+             ((< x 0)  'register)
+             ((<= x 4) 'branch)
+             (t        'saved))))
+  (let ((current (if jump-tree-visualizer-selection-mode
+                     jump-tree-visualizer-selected-node
+                   (jump-tree-current jump-tree-pos-tree))))
+    (unwind-protect
+        (jump-tree-expand-up
+         (jump-tree-node-next current)))
+    ))
+
 (defun jump-tree-visualizer-toggle-timestamps ()
   "Toggle display of time-stamps."
   (interactive)
