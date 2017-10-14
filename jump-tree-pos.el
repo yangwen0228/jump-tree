@@ -71,12 +71,18 @@
 
 (defvar jump-tree-pos-list '()
   "Jump history list, contain POSITION entries '(file-name . marker).")
+(put 'jump-tree-pos-list 'permanent-local t)
+(make-variable-buffer-local 'jump-tree-pos-list)
 
 (defvar jump-tree-pos-tree nil
   "Tree of position entries globally.")
+(put 'jump-tree-pos-tree 'permanent-local t)
+(make-variable-buffer-local 'jump-tree-pos-tree)
 
 (defvar jump-tree-pos-list-position nil
   "Record the `position' before executing command.")
+(put 'jump-tree-pos-list-position 'permanent-local t)
+(make-variable-buffer-local 'jump-tree-pos-list-position)
 
 (defcustom jump-tree-ex-mode t
   "Whether record the position, when `jump-prev'."
